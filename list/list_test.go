@@ -3,12 +3,14 @@ package list
 import (
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestPushBack(t *testing.T) {
 	l := NewList()
+	now := time.Now()
 	var wg sync.WaitGroup
-	total := 100000
+	total := 1000000
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(m int) {
@@ -19,6 +21,7 @@ func TestPushBack(t *testing.T) {
 			t.Log(m, "done")
 		}(i)
 	}
+	t.Log(time.Now().Sub(now).String())
 	wg.Wait()
 	all := make(map[int]struct{})
 	l.Walk(func(v interface{}) {

@@ -1,6 +1,7 @@
 package list
 
 import (
+	"runtime"
 	"sync/atomic"
 	"unsafe"
 )
@@ -86,32 +87,38 @@ func (l *LinkedList) PushFront(v interface{}) {
 // tail.next = elem
 // root.prev = elem
 func (l *LinkedList) PushBack(v interface{}) {
-	n := createElem(v)
-	root := l.getRoot()
 	for {
-		if root.next == nil {
-			ok := l.addFirst(n)
-			if ok {
-				break
-			}
-			continue
+		if l.insert((*node)(l.root).prev,
+			l.root, v) {
+			break
 		}
-		tail := root.prev
-		elem := unsafe.Pointer(n)
-		if !atomic.CompareAndSwapPointer(
-			&(((*node)(tail)).next),
-			l.root, elem) {
-			continue
-		}
-		if !atomic.CompareAndSwapPointer(&n.prev, nil, tail) {
-			continue
-		}
-		if !atomic.CompareAndSwapPointer(&n.next, nil, l.root) {
-			continue
-		}
-		if !atomic.CompareAndSwapPointer(&root.prev, tail, elem) {
-			continue
-		}
-		break
+		runtime.Gosched()
 	}
+}
+
+func (l *LinkedList) insert(prev, next unsafe.Pointer, v interface{}) bool {
+	n := createElem(v)
+	if prev == nil && (*node)(next).prev == nil ||
+		next == nil && (*node)(prev).next == nil {
+		return l.addFirst(n)
+	}
+	if prev == nil || next == nil {
+		return false
+	}
+	elem := unsafe.Pointer(n)
+	if !atomic.CompareAndSwapPointer(
+		&(((*node)(prev)).next),
+		next, elem) {
+		return false
+	}
+	if !atomic.CompareAndSwapPointer(&n.prev, nil, prev) {
+		return false
+	}
+	if !atomic.CompareAndSwapPointer(&n.next, nil, next) {
+		return false
+	}
+	if !atomic.CompareAndSwapPointer(&((*node)(next).prev), prev, elem) {
+		return false
+	}
+	return true
 }
